@@ -1,9 +1,7 @@
+// use threadpool::ThreadPool;
+use WSCC::ThreadPool;
 use std::{ 
-    fs, process,
-    io::{prelude::*, BufReader},
-    net::{SocketAddr, TcpListener, TcpStream},
-    thread::{sleep},
-    time::Duration
+    fs, io::{prelude::*, BufReader}, net::{SocketAddr, TcpListener, TcpStream}, process, sync::mpsc::channel, thread::{self, sleep}, time::Duration
 };
 
 
@@ -16,15 +14,18 @@ fn main() {
         process::exit(1);
     });
 
+    let pool = ThreadPool::new(4);
+
     for stream in listener.incoming() {
-        println!("Buyaaaah, connection was made~!!!!");
         let stream = stream.unwrap();
 
-        handle_connection(stream);
-    }
+        pool.execute(|| {
+            handle_connection(stream);
+        });
 
-    println!("Hello, world!");
+    } 
     
+    println!("Shutting down.");
 }
 
 
@@ -45,8 +46,6 @@ fn start_ws(addrs: Vec<SocketAddr>) -> Option<TcpListener> {
                 }
 
                 println!("{}/{} COULDN'T START A SERVER. RETRYING...", attempts, max_attempts);
-
-
                 sleep(Duration::new(3, 0));
             }
         }
@@ -57,20 +56,24 @@ fn start_ws(addrs: Vec<SocketAddr>) -> Option<TcpListener> {
 
 fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&stream);
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|result| !result.is_empty())
-        .collect();
+    let request_line = buf_reader.lines().next().unwrap().unwrap(); 
 
-    // println!("Request: {http_request:#?}");
+    let (status_line, filename) = match &request_line[..] {
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "./html/index.html"),
+        "GET /sleep HTTP/1.1" => {
+            println!("Request to GET /sleep HTTP/1.1 was made");
+            sleep(Duration::from_secs(5));
+            ("HTTP/1.1 200 OK", "./html/index.html")
+        },
+        _ => ("HTTP/1.1 404 NOT FOUND", "./html/404.html")
+    };
 
-    let status_line = "HTTP/1.1 200 OK";
-    let contents = fs::read_to_string("./html/index.html").unwrap();
+    let contents = fs::read_to_string(filename).unwrap();
     let length = contents.len();
 
-    let http_response = 
-        format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}\r\n");
+    let http_response = format!(
+        "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
+    );
 
     stream.write_all(http_response.as_bytes()).unwrap();
 }

@@ -2,11 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Hello!</title>
+    <title>Chat!</title>
   </head>
   <body>
     <h1>Hello!</h1>
     <p>Hi from Rust</p>
+    <form action="" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file">
+        <button type="submit">Send file to the server</button>
+    </form>
+    <script>
+        let button = document.getElementById("file");
+        console.log(button);
+    </script>
   </body>
 </html>
 
