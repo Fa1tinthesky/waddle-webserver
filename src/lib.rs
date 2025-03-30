@@ -3,6 +3,7 @@ use std::{
     thread
 };
 
+pub mod router;
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 

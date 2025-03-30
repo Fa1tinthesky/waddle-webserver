@@ -1,7 +1,7 @@
 // use threadpool::ThreadPool;
-use WSCC::ThreadPool;
+use WSCC::{ router::{Router}, ThreadPool };
 use std::{ 
-    fs, io::{prelude::*, BufReader}, net::{SocketAddr, TcpListener, TcpStream}, process, sync::mpsc::channel, thread::{self, sleep}, time::Duration
+    fs, io::{prelude::*, BufReader}, net::{SocketAddr, TcpListener, TcpStream}, process, thread::{self, sleep}, time::Duration
 };
 
 
@@ -46,7 +46,7 @@ fn start_ws(addrs: Vec<SocketAddr>) -> Option<TcpListener> {
                 }
 
                 println!("{}/{} COULDN'T START A SERVER. RETRYING...", attempts, max_attempts);
-                sleep(Duration::new(3, 0));
+                sleep(Duration::new(5, 0));
             }
         }
     };
@@ -56,7 +56,9 @@ fn start_ws(addrs: Vec<SocketAddr>) -> Option<TcpListener> {
 
 fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&stream);
-    let request_line = buf_reader.lines().next().unwrap().unwrap(); 
+    // match request_line
+    let request_line = buf_reader.lines().next().expect("Problem is here, at line 59").unwrap(); 
+    // buf_reader.lines().next().unwrap()..
 
     let (status_line, filename) = match &request_line[..] {
         "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "./html/index.html"),
@@ -65,8 +67,18 @@ fn handle_connection(mut stream: TcpStream) {
             sleep(Duration::from_secs(5));
             ("HTTP/1.1 200 OK", "./html/index.html")
         },
+        "GET /index.js HTTP/1.1" => {
+            let router = Router::new();
+            match router.get_static_file("./js/index.js") {
+                Some(x) => println!("FILE FOUND AT: {}", x),
+                None => println!("FILE NOT FOUND 404"),
+            }
+    
+            ("HTTP/1.1 200 OK", "./js/index.js")
+        } 
         _ => ("HTTP/1.1 404 NOT FOUND", "./html/404.html")
     };
+
 
     let contents = fs::read_to_string(filename).unwrap();
     let length = contents.len();
@@ -81,7 +93,8 @@ fn handle_connection(mut stream: TcpStream) {
 fn generate_aux_ports(base_port: u16) -> Vec<SocketAddr> { 
     let mut addrs = vec![];
     for i in base_port-10..=base_port+10 {
-        addrs.push(SocketAddr::from(([127, 0, 0, 1], i)));
+        // addrs.push(SocketAddr::from(([127, 0, 0, 1], i)));
+        addrs.push(SocketAddr::from(([0, 0, 0, 0], i)));
     }
 
     return addrs;
